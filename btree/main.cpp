@@ -106,8 +106,16 @@ struct btree {
         void erase( const value_type &val )
         {
             auto node = node_with( val );
-            if( node ) {
-
+            if( node.first ) {
+                auto n = node.first;
+                auto p = node.second;
+                if( n->is_leaf( ) ) {
+                    n->values_.erase( n->values_.begin( ) + p );
+                } else {
+                    auto val = std::move(n->next_[p + 1]->values_[0]);
+                    n->next_[p + 1]->values_.erase(n->next_[p + 1]->values_.begin( ));
+                    n->values_[p] = std::move(val);
+                }
             }
         }
 
@@ -281,6 +289,8 @@ void print( const A &a )
 
 int main( )
 {
+    srand(time(nullptr));
+
     using btree_type = btree<int, 17>;
     btree_type bt;
 
@@ -288,7 +298,10 @@ int main( )
         bt.insert( i );
     }
 
-    auto nw = bt.root_->node_with( 613 );
+    bt.root_->erase( 44 );
+
+    auto nw = bt.root_->node_with( 13 );
+    //auto nw = bt.root_->node_with( random() % 2100 );
 
     if( nw.first ) {
         print( nw.first->values_ );

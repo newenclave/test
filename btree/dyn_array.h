@@ -164,9 +164,7 @@ namespace etool {
         {
             std::size_t count = 0;
             while( (count != max_size( )) && (b != e) ) {
-                value_type tmp = std::move(*b);
-                vals_[count++] = std::move(tmp);
-                ++b;
+                vals_[count++] = std::move(*(b++));
             }
             if( count != max_size( ) ) {
                 fill_ = count;
