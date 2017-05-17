@@ -295,13 +295,13 @@ int main( )
     btree_type bt;
 
     for( auto i=0; i<2100; i++ ) {
-        bt.insert( i );
+        bt.insert( random() % 4200 );
     }
 
     bt.root_->erase( 44 );
 
-    auto nw = bt.root_->node_with( 13 );
-    //auto nw = bt.root_->node_with( random() % 2100 );
+    //auto nw = bt.root_->node_with( 13 );
+    auto nw = bt.root_->node_with( random() % 2100 );
 
     if( nw.first ) {
         print( nw.first->values_ );
