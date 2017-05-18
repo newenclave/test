@@ -150,7 +150,7 @@ struct btree {
                 if( (rs > ls) && right->has_donor( ) ) {
                     values_[pos] = std::move(right->values_[0]);
                     right->values_.erase_pos( 0 );
-                } else {
+                } else if( left->has_donor( ) ) {
                     values_[pos] = std::move(left->last( ));
                     left->values_.reduce(1);
                 }
@@ -418,7 +418,7 @@ int main( )
     bt.insert( 26 );
     bt.insert( 35 );
 
-    bt.root_->erase( 15 );
+    bt.root_->erase( 10 );
 
     auto nw = bt.root_->node_with( 3 );
     //auto nw = bt.root_->node_with( random() % 2100 );
