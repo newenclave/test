@@ -141,19 +141,19 @@ struct btree {
         void merge( const value_type &val, bnode *node, std::size_t pos )
         {
             auto l = node->next_[pos].get( );
-            auto r = node->next_[pos + 1].get( );
+            auto r = std::move(node->next_[pos + 1]);
 
             l->values_.push_back( std::move(node->values_[pos]) );
 
             node->values_.erase_pos(pos);
-            node->next_[pos + 1].swap( node->next_[pos] );
+            node->next_[pos + 1] = std::move( node->next_[pos] );
             node->next_.erase_pos(pos);
 
-            for( auto &&v: r->values_ ) {
+            for( auto &v: r->values_ ) {
                 l->values_.push_back( std::move(v) );
             }
 
-            for( auto &&p: r->next_ ) {
+            for( auto &p: r->next_ ) {
                 l->next_.push_back( std::move(p) );
             }
 
@@ -196,9 +196,14 @@ struct btree {
             }
         }
 
-        void remove_from_node( const value_type & /*val*/, std::size_t pos )
+        void remove_from_node( const value_type &val, std::size_t pos )
         {
-
+            auto ml = most_left( this );
+            values_[pos] = std::move(ml->last( ));
+            ml->values_.reduce( 1 ); /// leaf! doesn't have children
+            if( ml->empty( ) ) {
+                ml->fix_me( val );
+            }
         }
 
         void erase_fix( const value_type &val, std::size_t pos )
@@ -368,7 +373,7 @@ struct btree {
         bnode *most_left( bnode *node )
         {
             bnode *res = node;
-            while(node && !node->empty( ) && node->next_[0]) {
+            while( node && !node->next_.empty( ) && node->next_[0] ) {
                 res = node;
                 node = node->next_[0].get( );
             }
@@ -379,7 +384,7 @@ struct btree {
         bnode *most_right( bnode *node )
         {
             bnode *res = node;
-            while(node && !node->empty( ) && node->next_[node->size( )]) {
+            while(node && !node->next_.empty( ) && node->next_[node->size( )]) {
                 res = node;
                 node = node->next_[node->size( )].get( );
             }
@@ -441,6 +446,15 @@ struct btree {
         pointer_array next_;
     };
 
+    void erase( const value_type &val )
+    {
+        root_->erase( val );
+        if( root_->empty( ) ) {
+            std::cout << "emptyroot!";
+            /// ?
+        }
+    }
+
     void insert( value_type val )
     {
         root_->insert( std::move(val) );
@@ -488,6 +502,7 @@ std::size_t minim( std::size_t v )
 
 int main( )
 {
+
     srand(time(nullptr));
 
     using btree_type = btree<int, 3>;
@@ -501,16 +516,18 @@ int main( )
 
     bt.root_->erase( 3 );
 
-    auto nw = bt.root_->node_with( 3 );
-    //auto nw = bt.root_->node_with( random() % 2100 );
+    bt.root_->erase( 6 );
 
-    if( nw.first ) {
+//    auto nw = bt.root_->node_with( 3 );
+//    //auto nw = bt.root_->node_with( random() % 2100 );
 
-        auto sb = nw.first->siblings( );
+//    if( nw.first ) {
 
-        print( nw.first->values_ );
-        std::cout << nw.second << "\n";
-    }
+//        auto sb = nw.first->siblings( );
+
+//        print( nw.first->values_ );
+//        std::cout << nw.second << "\n";
+//    }
 
     return 0;
 }

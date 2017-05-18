@@ -140,7 +140,7 @@ namespace etool {
 
         iterator erase( iterator pos )
         {
-            for(auto tmp = pos; tmp != end( ); ++tmp) {
+            for( auto tmp = pos; tmp != end( ); ++tmp ) {
                 if( tmp + 1 != end( ) ) {
                     *tmp = std::move(*(tmp + 1));
                 }
