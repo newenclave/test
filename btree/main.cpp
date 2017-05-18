@@ -131,8 +131,8 @@ struct btree {
             node->values_[pos] = std::move(r->first( ));
 
             if( !l->is_leaf( ) ) {
+                r->next_[0]->parent_ = l;
                 l->next_.push_back( std::move( r->next_[0] ) );
-                l->next_[l->size( )]->parent_ = l;
                 r->next_.erase_pos( 0 );
             }
 
@@ -156,7 +156,7 @@ struct btree {
             }
 
             for( auto &p: r->next_ ) {
-                p->parent_ = l;
+                //p->parent_ = l->parent_;
                 l->next_.push_back( std::move(p) );
             }
 
@@ -336,6 +336,8 @@ struct btree {
             static const std::size_t splitter = middle + odd;
 
             ptr_type right(new bnode);
+
+            right->parent_ = src->parent_;
 
             right->values_.assign( src->values_.begin( ) + (middle + 1),
                                    src->values_.end( ) );
