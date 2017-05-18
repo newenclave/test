@@ -104,20 +104,78 @@ struct btree {
             next_   = std::move(other.next_);
         }
 
+        void erase_fix( const value_type &val, std::size_t pos )
+        {
+            if( is_leaf( ) ) {
+
+                values_.erase_pos( pos );
+
+                if( less_minimum( ) && parent_ ) {
+
+                    auto sb    = siblings( );
+                    auto left  = sb.first;
+                    auto right = sb.second;
+
+                    auto ls = left  ? left->size( )  : 0;
+                    auto rs = right ? right->size( ) : 0;
+
+                    auto pp = parent_->lower_of( val );
+
+                    if( (rs > ls) && right->has_donor( ) ) {
+
+                        /// rotate right
+                        values_.push_back( std::move(parent_->values_[pp]) );
+                        parent_->values_[pos] = std::move(right->values_[0]);
+                        right->values_.erase_pos( 0 );
+                    } else if( left->has_donor( ) ) {
+
+                        /// rotate left
+                        values_.push_back( std::move(parent_->values_[pp]) );
+                        parent_->values_[pos] = std::move(left->last( ));
+                        left->values_.reduce(1);
+                    } else {
+                        /// merging
+                    }
+                }
+            }
+        }
+
+        value_type &last( )
+        {
+            return values_[size( ) - 1];
+        }
+
+        std::size_t size( ) const
+        {
+            return values_.size( );
+        }
+
+        bool less_minimum( ) const
+        {
+            return (size( ) < minimum);
+        }
+
+        bool has_donor( ) const
+        {
+            return (size( ) > minimum);
+        }
+
         void erase( const value_type &val )
         {
             auto node = node_with( val );
             if( node.first ) {
-                auto n = node.first;
-                auto p = node.second;
-                if( n->is_leaf( ) ) {
-                    n->values_.erase( n->values_.begin( ) + p );
-                } else {
-                    auto val = std::move(n->next_[p + 1]->values_[0]);
-                    n->next_[p + 1]->values_.erase(n->next_[p + 1]->values_.begin( ));
-                    n->values_[p] = std::move(val);
-                }
+                node.first->erase_fix( val, node.second );
             }
+        }
+
+        bool full( ) const
+        {
+            return values_.full( );
+        }
+
+        bool is_leaf( ) const
+        {
+            return next_.empty( );
         }
 
         std::size_t lower_of( const value_type &val ) const
@@ -172,11 +230,6 @@ struct btree {
             }
         }
 
-        bool full( ) const
-        {
-            return values_.full( );
-        }
-
         static
         std::pair<ptr_type, ptr_type> split( ptr_type src )
         {
@@ -202,11 +255,6 @@ struct btree {
             src->values_.reduce(splitter);
 
             return std::make_pair(std::move(src), std::move(right));
-        }
-
-        bool is_leaf( ) const
-        {
-            return next_.empty( );
         }
 
         std::pair<bnode *, std::size_t> node_with( const value_type &val )
@@ -323,16 +371,16 @@ int main( )
 {
     srand(time(nullptr));
 
-    using btree_type = btree<int, 5>;
+    using btree_type = btree<int, 3>;
     btree_type bt;
 
-    for( auto i=0; i<2100; i++ ) {
+    for( auto i=0; i<100; i++ ) {
         bt.insert( i );
     }
 
-    bt.root_->erase( 44 );
+    bt.root_->erase( 22 );
 
-    auto nw = bt.root_->node_with( 404 );
+    auto nw = bt.root_->node_with( 3 );
     //auto nw = bt.root_->node_with( random() % 2100 );
 
 

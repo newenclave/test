@@ -147,6 +147,16 @@ namespace etool {
             return pos;
         }
 
+        iterator erase_pos( std::size_t pos )
+        {
+            return erase( begin( ) + pos );
+        }
+
+        void push_back( value_type val )
+        {
+            vals_[fill_++] = std::move(val);
+        }
+
         template <typename ItrT>
         void assign( ItrT b, ItrT e )
         {
