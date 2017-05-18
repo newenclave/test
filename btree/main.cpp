@@ -164,19 +164,23 @@ struct btree {
 
         void fix_me( const value_type &val )
         {
-            auto sb = siblings( val );
+            auto sb = siblings( );
+            //auto sb = siblings( val );
 
             if( sb.first && sb.first->has_donor( ) ) {
 
-                 rotate_cw( parent_, parent_->lower_of( val ) );
+                rotate_cw( parent_, my_position( ) );
+                //rotate_cw( parent_, parent_->lower_of( val ) );
 
             } else if( sb.second && sb.second->has_donor( ) ) {
 
-                rotate_ccw( parent_, parent_->lower_of( val ) );
+                rotate_ccw( parent_, my_position( ) );
+                //rotate_ccw( parent_, parent_->lower_of( val ) );
 
             } else {
 
-                auto pp = parent_->lower_of( val );
+                auto pp = my_position( );
+                //auto pp = parent_->lower_of( val );
 
                 if( sb.first ) {
                     merge( val, parent_, pp - 1 );
@@ -391,52 +395,54 @@ struct btree {
             return res;
         }
 
-        bnode *left_sibling( )
+        std::pair<bnode *, bnode *> siblings_by_pos( size_t my_pos )
         {
-            if( parent_ ) {
-                auto my_pos = parent_->lower_of( values_[0] );
-                if( my_pos > 0 ) {
-                    return parent_->next_[my_pos - 1].get( );
-                }
+            bnode *left  = nullptr;
+            bnode *right = nullptr;
+
+            if( my_pos > 0 ) {
+                left = parent_->next_[my_pos - 1].get( );
             }
-            return nullptr;
+
+            if( my_pos < parent_->size( ) ) {
+                right = parent_->next_[my_pos + 1].get( );
+            }
+
+            return std::make_pair( left, right );
         }
 
-        bnode *right_sibling( )
+        std::size_t my_position( ) const
         {
-            if( parent_ ) {
-                auto my_pos = parent_->lower_of( values_[0] );
-                if( my_pos < maximum ) {
-                    return parent_->next_[my_pos + 1].get( );
+            size_t my_pos = 0;
+            for( ;parent_->next_.size( ); ++my_pos ) {
+                if( parent_->next_[my_pos].get( ) == this ) {
+                    break;
                 }
             }
-            return nullptr;
+            return my_pos;
         }
 
         std::pair<bnode *, bnode *> siblings( )
         {
-            return siblings( values_[0] );
+            if( values_.empty( ) ) {
+
+                size_t my_pos = my_position( );
+                std::cout << "pos: " << my_pos << "\n";
+
+                return siblings_by_pos( my_pos );
+
+            } else {
+                return siblings( values_[0] );
+            }
         }
 
         std::pair<bnode *, bnode *> siblings( const value_type &val )
         {
             if( parent_ ) {
-
-                bnode *left = nullptr;
-                bnode *right = nullptr;
-
                 auto my_pos = parent_->lower_of( val );
+                std::cout << "pos: " << my_pos << "\n";
 
-                if( my_pos > 0 ) {
-                    left = parent_->next_[my_pos - 1].get( );
-                }
-
-                if( my_pos < parent_->size( ) ) {
-                    right = parent_->next_[my_pos + 1].get( );
-                }
-
-                return std::make_pair( left, right );
-
+                return siblings_by_pos( my_pos );
             }
             return std::make_pair(nullptr, nullptr);
         }
