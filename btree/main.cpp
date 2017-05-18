@@ -82,8 +82,8 @@ struct btree {
     struct bnode {
 
         using ptr_type      = std::unique_ptr<bnode>;
-        using value_array   = dyn_array<value_type, NodeMax>;
-        using pointer_array = dyn_array<ptr_type, NodeMax + 1>;
+        using value_array   = dyn_array<value_type, maximum>;
+        using pointer_array = dyn_array<ptr_type,   maximum + 1>;
 
         bnode( )
         {
@@ -122,12 +122,12 @@ struct btree {
 
         std::size_t lower_of( const value_type &val ) const
         {
-            lower_bound( &values_[0], values_.size( ), val, cmp( ) );
+            return lower_bound( &values_[0], values_.size( ), val, cmp( ) );
         }
 
         std::size_t upper_of( const value_type &val ) const
         {
-            upper_bound( &values_[0], values_.size( ), val, cmp( ) );
+            return upper_bound( &values_[0], values_.size( ), val, cmp( ) );
         }
 
         void insert( value_type val )
@@ -228,7 +228,7 @@ struct btree {
         {
             if( parent_ ) {
                 auto my_pos = parent_->lower_of( values_[0] );
-                if( my_pos ) {
+                if( my_pos > 0 ) {
                     return parent_->next_[my_pos - 1].get( );
                 }
             }
@@ -244,6 +244,29 @@ struct btree {
                 }
             }
             return nullptr;
+        }
+
+        std::pair<bnode *, bnode *> siblings( )
+        {
+            if( parent_ ) {
+
+                bnode *left = nullptr;
+                bnode *right = nullptr;
+
+                auto my_pos = parent_->lower_of( values_[0] );
+
+                if( my_pos > 0 ) {
+                    left = parent_->next_[my_pos - 1].get( );
+                }
+
+                if( my_pos < maximum ) {
+                    right = parent_->next_[my_pos + 1].get( );
+                }
+
+                return std::make_pair( left, right );
+
+            }
+            return std::make_pair(nullptr, nullptr);
         }
 
         bnode *parent_ = nullptr;
@@ -304,15 +327,20 @@ int main( )
     btree_type bt;
 
     for( auto i=0; i<2100; i++ ) {
-        bt.insert( random() % 4200 );
+        bt.insert( i );
     }
 
     bt.root_->erase( 44 );
 
-    //auto nw = bt.root_->node_with( 13 );
-    auto nw = bt.root_->node_with( random() % 2100 );
+    auto nw = bt.root_->node_with( 404 );
+    //auto nw = bt.root_->node_with( random() % 2100 );
+
+
 
     if( nw.first ) {
+
+        auto sb = nw.first->siblings( );
+
         print( nw.first->values_ );
         std::cout << nw.second << "\n";
     }
