@@ -50,11 +50,12 @@ std::size_t upper_bound( const T *arr, std::size_t length,
 template <typename T, std::size_t NodeMax, typename Less = std::less<T> >
 struct btree {
 
-    static_assert( ((NodeMax & 1) == 1) && (NodeMax > 2),
-                   "Count must be odd and greater then 2" );
+    static_assert( NodeMax > 2, "Count must be greater then 2" );
 
     static const std::size_t maximum = NodeMax;
     static const std::size_t middle  = maximum / 2;
+    static const std::size_t odd     = maximum % 2;
+    static const std::size_t minimum = middle  + odd - 1;
 
     using value_type = T;
 
@@ -119,14 +120,23 @@ struct btree {
             }
         }
 
+        std::size_t lower_of( const value_type &val ) const
+        {
+            lower_bound( &values_[0], values_.size( ), val, cmp( ) );
+        }
+
+        std::size_t upper_of( const value_type &val ) const
+        {
+            upper_bound( &values_[0], values_.size( ), val, cmp( ) );
+        }
+
         void insert( value_type val )
         {
             if( values_.empty( ) ) {
                 values_.emplace(values_.begin( ), std::move(val));
             } else {
 
-                auto pos = lower_bound( &values_[0], values_.size( ),
-                                         val, cmp( ) );
+                auto pos = lower_of( val );
 
                 if( pos != values_.size( ) && cmp::eq(values_[pos], val ) ) {
                     return;
@@ -170,24 +180,26 @@ struct btree {
         static
         std::pair<ptr_type, ptr_type> split( ptr_type src )
         {
+            static const std::size_t splitter = middle + odd;
+
             ptr_type right(new bnode);
 
-            right->values_.assign( src->values_.begin( ) + middle + 1,
+            right->values_.assign( src->values_.begin( ) + (middle + 1),
                                    src->values_.end( ) );
 
             if(!src->next_.empty( ) ) {
 
-                right->next_.assign_move( src->next_.begin( ) + middle + 1,
+                right->next_.assign_move( src->next_.begin( ) + (middle + 1),
                                           src->next_.end( ) );
 
-                for( std::size_t i = middle + 1; i < maximum + 1; ++i ) {
+                for( std::size_t i = splitter; i < maximum + 1; ++i ) {
                     src->next_[i].reset( );
                 }
 
-                src->next_.reduce(middle + 1);
+                src->next_.reduce(splitter);
             }
 
-            src->values_.reduce(middle + 1);
+            src->values_.reduce(splitter);
 
             return std::make_pair(std::move(src), std::move(right));
         }
@@ -199,8 +211,7 @@ struct btree {
 
         std::pair<bnode *, std::size_t> node_with( const value_type &val )
         {
-            auto pos = lower_bound( &values_[0], values_.size( ),
-                                     val, cmp( ) );
+            auto pos = lower_of( val );
 
             if( pos != values_.size( ) && cmp::eq(values_[pos], val) ) {
                 return std::make_pair(this, pos);
@@ -215,11 +226,10 @@ struct btree {
 
         bnode *left_sibling( )
         {
-            if( parent_ && (this != parent_->next_[0].get( ) ) ) {
-                for( std::size_t i = 1; i < parent_->next_.size( ); ++i ) {
-                    if( parent_->next_[i].get( ) == this ) {
-                        return parent_->next_[i - 1].get( );
-                    }
+            if( parent_ ) {
+                auto my_pos = parent_->lower_of( values_[0] );
+                if( my_pos ) {
+                    return parent_->next_[my_pos - 1].get( );
                 }
             }
             return nullptr;
@@ -227,19 +237,12 @@ struct btree {
 
         bnode *right_sibling( )
         {
-
             if( parent_ ) {
-                auto s = parent_->next_.size( ) - 1;
-                if( parent_->next_[s] != this ) { /// last one
-
-                    for( std::size_t i = s; i > 0; --i ) {
-                        if( parent_->next_[i - 1].get( ) == this ) {
-                            return parent_->next_[i].get( );
-                        }
-                    }
+                auto my_pos = parent_->lower_of( values_[0] );
+                if( my_pos < maximum ) {
+                    return parent_->next_[my_pos + 1].get( );
                 }
             }
-
             return nullptr;
         }
 
@@ -254,7 +257,8 @@ struct btree {
 
         if( root_->full( ) ) {
             std::unique_ptr<bnode> new_root(new bnode);
-            auto val = std::move(root_->values_[middle]);
+
+            val       = std::move(root_->values_[middle]);
             auto pair = bnode::split(std::move(root_));
 
             pair.first->parent_  = new_root.get( );
@@ -285,13 +289,18 @@ void print( const A &a )
     std::cout << "\ntotal: " << a.size( ) << "\n";
 }
 
+std::size_t minim( std::size_t v )
+{
+    return (v / 2) + (v % 2) - 1;
+}
+
 }
 
 int main( )
 {
     srand(time(nullptr));
 
-    using btree_type = btree<int, 17>;
+    using btree_type = btree<int, 5>;
     btree_type bt;
 
     for( auto i=0; i<2100; i++ ) {
