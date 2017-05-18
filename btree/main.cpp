@@ -115,6 +115,7 @@ struct btree {
 
             if( !l->is_leaf( ) ) {
                 r->next_.push_front( std::move( l->next_[l->size( )] ) );
+                r->next_[0]->parent_ = r;
                 l->next_.reduce( 1 );
             }
             l->values_.reduce( 1 );
@@ -131,6 +132,7 @@ struct btree {
 
             if( !l->is_leaf( ) ) {
                 l->next_.push_back( std::move( r->next_[0] ) );
+                l->next_[l->size( )]->parent_ = l;
                 r->next_.erase_pos( 0 );
             }
 
@@ -154,6 +156,7 @@ struct btree {
             }
 
             for( auto &p: r->next_ ) {
+                p->parent_ = l;
                 l->next_.push_back( std::move(p) );
             }
 
@@ -509,16 +512,18 @@ std::size_t minim( std::size_t v )
 int main( )
 {
 
+    auto maxx = 30000;
+
     srand(time(nullptr));
 
-    using btree_type = btree<int, 3>;
+    using btree_type = btree<int, 7>;
     btree_type bt;
 
-    for( auto i=1; i<=30; i++ ) {
+    for( auto i=1; i<=maxx; i++ ) {
         bt.insert( i );
     }
 
-    for( auto i=30; i>=1; i-- ) {
+    for( auto i=maxx; i>=1; i-- ) {
         bt.erase( i );
     }
 
