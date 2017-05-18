@@ -108,13 +108,13 @@ struct btree {
         {
             if( is_leaf( ) ) {
 
+                auto sb    = siblings( val );
+                auto left  = sb.first;
+                auto right = sb.second;
+
                 values_.erase_pos( pos );
 
                 if( less_minimum( ) && parent_ ) {
-
-                    auto sb    = siblings( );
-                    auto left  = sb.first;
-                    auto right = sb.second;
 
                     auto ls = left  ? left->size( )  : 0;
                     auto rs = right ? right->size( ) : 0;
@@ -125,13 +125,13 @@ struct btree {
 
                         /// rotate right
                         values_.push_back( std::move(parent_->values_[pp]) );
-                        parent_->values_[pos] = std::move(right->values_[0]);
+                        parent_->values_[pp] = std::move(right->values_[0]);
                         right->values_.erase_pos( 0 );
-                    } else if( left->has_donor( ) ) {
+                    } else if( left && left->has_donor( ) ) {
 
                         /// rotate left
-                        values_.push_back( std::move(parent_->values_[pp]) );
-                        parent_->values_[pos] = std::move(left->last( ));
+                        values_.push_back( std::move(parent_->values_[pp - 1]) );
+                        parent_->values_[pp - 1] = std::move(left->last( ));
                         left->values_.reduce(1);
                     } else {
                         /// merging
@@ -296,18 +296,23 @@ struct btree {
 
         std::pair<bnode *, bnode *> siblings( )
         {
+            return siblings( values_[0] );
+        }
+
+        std::pair<bnode *, bnode *> siblings( const value_type &val )
+        {
             if( parent_ ) {
 
                 bnode *left = nullptr;
                 bnode *right = nullptr;
 
-                auto my_pos = parent_->lower_of( values_[0] );
+                auto my_pos = parent_->lower_of( val );
 
                 if( my_pos > 0 ) {
                     left = parent_->next_[my_pos - 1].get( );
                 }
 
-                if( my_pos < maximum ) {
+                if( my_pos < parent_->size( ) ) {
                     right = parent_->next_[my_pos + 1].get( );
                 }
 
@@ -374,11 +379,20 @@ int main( )
     using btree_type = btree<int, 3>;
     btree_type bt;
 
-    for( auto i=0; i<100; i++ ) {
-        bt.insert( i );
-    }
+//    for( auto i=0; i<100; i++ ) {
+//        bt.insert( i );
+//    }
 
-    bt.root_->erase( 22 );
+    bt.insert( 20 );
+    bt.insert( 10 );
+    bt.insert( 30 );
+    bt.insert( 15 );
+    bt.insert( 5 );
+    bt.insert( 7 );
+    bt.insert( 26 );
+    bt.insert( 35 );
+
+    bt.root_->erase( 15 );
 
     auto nw = bt.root_->node_with( 3 );
     //auto nw = bt.root_->node_with( random() % 2100 );
