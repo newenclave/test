@@ -372,23 +372,27 @@ struct btree {
         static
         bnode *most_left( bnode *node )
         {
-            bnode *res = node;
-            while( node && !node->next_.empty( ) && node->next_[0] ) {
-                res = node;
-                node = node->next_[0].get( );
+            while( node ) {
+                if( node->next_[0] ) {
+                    node = node->next_[0].get( );
+                } else {
+                    break;
+                }
             }
-            return res;
+            return node;
         }
 
         static
         bnode *most_right( bnode *node )
         {
-            bnode *res = node;
-            while(node && !node->next_.empty( ) && node->next_[node->size( )]) {
-                res = node;
-                node = node->next_[node->size( )].get( );
+            while( node ) {
+                if( node->next_[node->size( )] ) {
+                    node = node->next_[node->size( )].get( );
+                } else {
+                    break;
+                }
             }
-            return res;
+            return node;
         }
 
         std::pair<bnode *, bnode *> siblings_by_pos( size_t my_pos )
@@ -450,7 +454,10 @@ struct btree {
     void erase( const value_type &val )
     {
         root_->erase( val );
-        if( root_->empty( ) ) {
+        if( root_->values_.empty( ) && !root_->next_.empty( ) ) {
+            auto tmp = std::move(root_->next_[0]);
+            tmp->parent_ = nullptr;
+            root_ = std::move(tmp);
             std::cout << "emptyroot!";
             /// ?
         }
@@ -509,15 +516,13 @@ int main( )
     using btree_type = btree<int, 3>;
     btree_type bt;
 
-    for( auto i=1; i<=10; i++ ) {
+    for( auto i=1; i<=30; i++ ) {
         bt.insert( i );
     }
 
-    bt.root_->erase( 7 );
-
-    bt.root_->erase( 3 );
-
-    bt.root_->erase( 6 );
+    for( auto i=1; i<=30; i++ ) {
+        bt.erase( i );
+    }
 
 //    auto nw = bt.root_->node_with( 3 );
 //    //auto nw = bt.root_->node_with( random() % 2100 );
