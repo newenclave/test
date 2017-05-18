@@ -104,39 +104,65 @@ struct btree {
             next_   = std::move(other.next_);
         }
 
+        void remove_from_leaf( const value_type &val, std::size_t pos )
+        {
+            auto sb    = siblings( val );
+            auto left  = sb.first;
+            auto right = sb.second;
+
+            values_.erase_pos( pos );
+
+            if( less_minimum( ) && parent_ ) {
+
+                auto ls = left  ? left->size( )  : 0;
+                auto rs = right ? right->size( ) : 0;
+
+                auto pp = parent_->lower_of( val );
+
+                if( (rs > ls) && right->has_donor( ) ) {
+
+                    /// rotate right
+                    values_.push_back( std::move(parent_->values_[pp]) );
+                    parent_->values_[pp] = std::move(right->values_[0]);
+                    right->values_.erase_pos( 0 );
+                } else if( left && left->has_donor( ) ) {
+
+                    /// rotate left
+                    values_.push_back( std::move(parent_->values_[pp - 1]) );
+                    parent_->values_[pp - 1] = std::move(left->last( ));
+                    left->values_.reduce(1);
+                } else {
+                    /// merging
+                }
+            }
+
+        }
+
+        void remove_from_node( const value_type & /*val*/, std::size_t pos )
+        {
+            auto left  = next_[pos].get( );
+            auto right = next_[pos + 1].get( );
+
+            auto ls = left->size( ) ;
+            auto rs = right->size( );
+
+            if( right->is_leaf( ) ) {
+                if( (rs > ls) && right->has_donor( ) ) {
+                    values_[pos] = std::move(right->values_[0]);
+                    right->values_.erase_pos( 0 );
+                } else {
+                    values_[pos] = std::move(left->last( ));
+                    left->values_.reduce(1);
+                }
+            }
+        }
+
         void erase_fix( const value_type &val, std::size_t pos )
         {
             if( is_leaf( ) ) {
-
-                auto sb    = siblings( val );
-                auto left  = sb.first;
-                auto right = sb.second;
-
-                values_.erase_pos( pos );
-
-                if( less_minimum( ) && parent_ ) {
-
-                    auto ls = left  ? left->size( )  : 0;
-                    auto rs = right ? right->size( ) : 0;
-
-                    auto pp = parent_->lower_of( val );
-
-                    if( (rs > ls) && right->has_donor( ) ) {
-
-                        /// rotate right
-                        values_.push_back( std::move(parent_->values_[pp]) );
-                        parent_->values_[pp] = std::move(right->values_[0]);
-                        right->values_.erase_pos( 0 );
-                    } else if( left && left->has_donor( ) ) {
-
-                        /// rotate left
-                        values_.push_back( std::move(parent_->values_[pp - 1]) );
-                        parent_->values_[pp - 1] = std::move(left->last( ));
-                        left->values_.reduce(1);
-                    } else {
-                        /// merging
-                    }
-                }
+                remove_from_leaf( val, pos );
+            } else {
+                remove_from_node( val, pos );
             }
         }
 
