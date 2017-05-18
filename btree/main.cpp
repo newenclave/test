@@ -458,8 +458,6 @@ struct btree {
             auto tmp = std::move(root_->next_[0]);
             tmp->parent_ = nullptr;
             root_ = std::move(tmp);
-            std::cout << "emptyroot!";
-            /// ?
         }
     }
 
@@ -520,7 +518,7 @@ int main( )
         bt.insert( i );
     }
 
-    for( auto i=1; i<=30; i++ ) {
+    for( auto i=30; i>=1; i-- ) {
         bt.erase( i );
     }
 
