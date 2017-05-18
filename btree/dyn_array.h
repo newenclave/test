@@ -141,7 +141,9 @@ namespace etool {
         iterator erase( iterator pos )
         {
             for(auto tmp = pos; tmp != end( ); ++tmp) {
-                *tmp = std::move(*(tmp + 1));
+                if( tmp + 1 != end( ) ) {
+                    *tmp = std::move(*(tmp + 1));
+                }
             }
             --fill_;
             return pos;
@@ -155,6 +157,11 @@ namespace etool {
         void push_back( value_type val )
         {
             vals_[fill_++] = std::move(val);
+        }
+
+        void push_front( value_type val )
+        {
+            emplace(begin( ), std::move(val));
         }
 
         template <typename ItrT>

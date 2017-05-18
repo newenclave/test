@@ -104,57 +104,101 @@ struct btree {
             next_   = std::move(other.next_);
         }
 
-        void remove_from_leaf( const value_type &val, std::size_t pos )
+        static
+        void rotate_cw( bnode *node, std::size_t pos ) // clock wise
         {
-            auto sb    = siblings( val );
-            auto left  = sb.first;
-            auto right = sb.second;
+            auto l = node->next_[pos].get( );
+            auto r = node->next_[pos + 1].get( );
 
-            values_.erase_pos( pos );
+            r->values_.push_front(std::move(node->values_[pos]));
+            node->values_[pos] = std::move(l->last( ));
 
-            if( less_minimum( ) && parent_ ) {
+            if( !l->is_leaf( ) ) {
+                r->next_.push_front( std::move( l->next_[l->size( )] ) );
+                l->next_.reduce( 1 );
+            }
+            l->values_.reduce( 1 );
+        }
 
-                auto ls = left  ? left->size( )  : 0;
-                auto rs = right ? right->size( ) : 0;
+        static
+        void rotate_ccw( bnode *node, std::size_t pos ) // contra clock wise
+        {
+            auto l = node->next_[pos].get( );
+            auto r = node->next_[pos + 1].get( );
+
+            l->values_.push_back(std::move(node->values_[pos]));
+            node->values_[pos] = std::move(r->first( ));
+
+            if( !l->is_leaf( ) ) {
+                l->next_.push_back( std::move( r->next_[0] ) );
+                r->next_.erase_pos( 0 );
+            }
+
+            r->values_.erase_pos( 0 );
+        }
+
+        static
+        void merge( const value_type &val, bnode *node, std::size_t pos )
+        {
+            auto l = node->next_[pos].get( );
+            auto r = node->next_[pos + 1].get( );
+
+            l->values_.push_back( std::move(node->values_[pos]) );
+
+            node->values_.erase_pos(pos);
+            node->next_[pos + 1].swap( node->next_[pos] );
+            node->next_.erase_pos(pos);
+
+            for( auto &&v: r->values_ ) {
+                l->values_.push_back( std::move(v) );
+            }
+
+            for( auto &&p: r->next_ ) {
+                l->next_.push_back( std::move(p) );
+            }
+
+            if( node->empty( ) && node->parent_ ) {
+                node->fix_me( val );
+            }
+        }
+
+        void fix_me( const value_type &val )
+        {
+            auto sb = siblings( val );
+
+            if( sb.first && sb.first->has_donor( ) ) {
+
+                 rotate_cw( parent_, parent_->lower_of( val ) );
+
+            } else if( sb.second && sb.second->has_donor( ) ) {
+
+                rotate_ccw( parent_, parent_->lower_of( val ) );
+
+            } else {
 
                 auto pp = parent_->lower_of( val );
 
-                if( (rs > ls) && right->has_donor( ) ) {
-
-                    /// rotate right
-                    values_.push_back( std::move(parent_->values_[pp]) );
-                    parent_->values_[pp] = std::move(right->values_[0]);
-                    right->values_.erase_pos( 0 );
-                } else if( left && left->has_donor( ) ) {
-
-                    /// rotate left
-                    values_.push_back( std::move(parent_->values_[pp - 1]) );
-                    parent_->values_[pp - 1] = std::move(left->last( ));
-                    left->values_.reduce(1);
+                if( sb.first ) {
+                    merge( val, parent_, pp - 1 );
                 } else {
-                    /// merging
+                    merge( val, parent_, pp );
                 }
             }
+        }
 
+        void remove_from_leaf( const value_type &val, std::size_t pos )
+        {
+
+            values_.erase_pos( pos );
+
+            if( empty( ) && parent_ ) {
+                fix_me( val );
+            }
         }
 
         void remove_from_node( const value_type & /*val*/, std::size_t pos )
         {
-            auto left  = next_[pos].get( );
-            auto right = next_[pos + 1].get( );
 
-            auto ls = left->size( ) ;
-            auto rs = right->size( );
-
-            if( right->is_leaf( ) ) {
-                if( (rs > ls) && right->has_donor( ) ) {
-                    values_[pos] = std::move(right->values_[0]);
-                    right->values_.erase_pos( 0 );
-                } else if( left->has_donor( ) ) {
-                    values_[pos] = std::move(left->last( ));
-                    left->values_.reduce(1);
-                }
-            }
         }
 
         void erase_fix( const value_type &val, std::size_t pos )
@@ -166,9 +210,30 @@ struct btree {
             }
         }
 
+        bnode *next_left( )
+        {
+            if( size( ) > 0 ) {
+                return next_[0].get( );
+            }
+            return nullptr;
+        }
+
+        bnode *next_right( )
+        {
+            if( size( ) > 0 ) {
+                return next_[size( )].get( );
+            }
+            return nullptr;
+        }
+
         value_type &last( )
         {
             return values_[size( ) - 1];
+        }
+
+        value_type &first( )
+        {
+            return values_[0];
         }
 
         std::size_t size( ) const
@@ -176,7 +241,7 @@ struct btree {
             return values_.size( );
         }
 
-        bool less_minimum( ) const
+        bool empty( ) const
         {
             return (size( ) < minimum);
         }
@@ -232,6 +297,7 @@ struct btree {
                                     std::move(val) );
 
                 } else {
+
                     next_[pos]->insert(std::move(val));
 
                     if( next_[pos]->full( ) ) {
@@ -296,6 +362,28 @@ struct btree {
             }
 
             return std::make_pair(nullptr, 0);
+        }
+
+        static
+        bnode *most_left( bnode *node )
+        {
+            bnode *res = node;
+            while(node && !node->empty( ) && node->next_[0]) {
+                res = node;
+                node = node->next_[0].get( );
+            }
+            return res;
+        }
+
+        static
+        bnode *most_right( bnode *node )
+        {
+            bnode *res = node;
+            while(node && !node->empty( ) && node->next_[node->size( )]) {
+                res = node;
+                node = node->next_[node->size( )].get( );
+            }
+            return res;
         }
 
         bnode *left_sibling( )
@@ -405,25 +493,16 @@ int main( )
     using btree_type = btree<int, 3>;
     btree_type bt;
 
-//    for( auto i=0; i<100; i++ ) {
-//        bt.insert( i );
-//    }
+    for( auto i=1; i<=10; i++ ) {
+        bt.insert( i );
+    }
 
-    bt.insert( 20 );
-    bt.insert( 10 );
-    bt.insert( 30 );
-    bt.insert( 15 );
-    bt.insert( 5 );
-    bt.insert( 7 );
-    bt.insert( 26 );
-    bt.insert( 35 );
+    bt.root_->erase( 7 );
 
-    bt.root_->erase( 10 );
+    bt.root_->erase( 3 );
 
     auto nw = bt.root_->node_with( 3 );
     //auto nw = bt.root_->node_with( random() % 2100 );
-
-
 
     if( nw.first ) {
 
