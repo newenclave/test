@@ -165,22 +165,18 @@ struct btree {
         void fix_me( const value_type &val )
         {
             auto sb = siblings( );
-            //auto sb = siblings( val );
 
             if( sb.first && sb.first->has_donor( ) ) {
 
                 rotate_cw( parent_, my_position( ) );
-                //rotate_cw( parent_, parent_->lower_of( val ) );
 
             } else if( sb.second && sb.second->has_donor( ) ) {
 
                 rotate_ccw( parent_, my_position( ) );
-                //rotate_ccw( parent_, parent_->lower_of( val ) );
 
             } else {
 
                 auto pp = my_position( );
-                //auto pp = parent_->lower_of( val );
 
                 if( sb.first ) {
                     merge( val, parent_, pp - 1 );
@@ -413,22 +409,23 @@ struct btree {
 
         std::size_t my_position( ) const
         {
-            size_t my_pos = 0;
-            for( ;parent_->next_.size( ); ++my_pos ) {
-                if( parent_->next_[my_pos].get( ) == this ) {
-                    break;
+            if(values_.empty( )) {
+                size_t my_pos = 0;
+                for( ;parent_->next_.size( ); ++my_pos ) {
+                    if( parent_->next_[my_pos].get( ) == this ) {
+                        break;
+                    }
                 }
+                return my_pos;
+            } else {
+                return parent_->lower_of( values_[0] );
             }
-            return my_pos;
         }
 
         std::pair<bnode *, bnode *> siblings( )
         {
             if( values_.empty( ) ) {
-
                 size_t my_pos = my_position( );
-                std::cout << "pos: " << my_pos << "\n";
-
                 return siblings_by_pos( my_pos );
 
             } else {
@@ -440,8 +437,6 @@ struct btree {
         {
             if( parent_ ) {
                 auto my_pos = parent_->lower_of( val );
-                std::cout << "pos: " << my_pos << "\n";
-
                 return siblings_by_pos( my_pos );
             }
             return std::make_pair(nullptr, nullptr);
