@@ -58,6 +58,7 @@ struct btree {
     static const std::size_t minimum = middle  + odd - 1;
 
     using value_type = T;
+    using key_type   = T;
 
     btree( )
         :root_(new bnode)
@@ -129,7 +130,7 @@ struct btree {
             return (size( ) > minimum);
         }
 
-        void erase( const value_type &val )
+        void erase( const key_type &val )
         {
             auto node = node_with( val );
             if( node.first ) {
@@ -147,12 +148,12 @@ struct btree {
             return next_.empty( );
         }
 
-        std::size_t lower_of( const value_type &val ) const
+        std::size_t lower_of( const key_type &val ) const
         {
             return lower_bound( &values_[0], values_.size( ), val, cmp( ) );
         }
 
-        std::size_t upper_of( const value_type &val ) const
+        std::size_t upper_of( const key_type &val ) const
         {
             return upper_bound( &values_[0], values_.size( ), val, cmp( ) );
         }
@@ -365,7 +366,7 @@ struct btree {
         }
 
 
-        std::pair<bnode *, std::size_t> node_with_rec( const value_type &val )
+        std::pair<bnode *, std::size_t> node_with_rec( const key_type &val )
         {
             auto pos = lower_of( val );
 
@@ -380,7 +381,7 @@ struct btree {
             return std::make_pair(nullptr, 0);
         }
 
-        std::pair<bnode *, std::size_t> node_with( const value_type &val )
+        std::pair<bnode *, std::size_t> node_with( const key_type &val )
         {
 
             auto next = this ;
@@ -469,7 +470,7 @@ struct btree {
             }
         }
 
-        std::pair<bnode *, bnode *> siblings( const value_type &val )
+        std::pair<bnode *, bnode *> siblings( const key_type &val )
         {
             if( parent_ ) {
                 auto my_pos = parent_->lower_of( val );
@@ -506,7 +507,7 @@ struct btree {
         pointer_array next_;
     };
 
-    void erase( const value_type &val )
+    void erase( const key_type &val )
     {
         root_->erase( val );
         if( root_->values_.empty( ) && !root_->next_.empty( ) ) {
@@ -573,7 +574,12 @@ int main( )
         //bt.insert( i );
     }
 
-    bt.root_->for_each( [ ]( int i ) {
+    int min = 0;
+
+    bt.root_->for_each( [&min]( int i ) {
+        if( i < min ) {
+            std::cout << "!!!!!!!\n";
+        }
         std::cout << " " << i;
     } );
     std::cout << "\n";
