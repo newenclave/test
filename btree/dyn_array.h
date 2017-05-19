@@ -154,6 +154,16 @@ namespace etool {
             return erase( begin( ) + pos );
         }
 
+        value_type &front( )
+        {
+            return vals_[0];
+        }
+
+        value_type &back( )
+        {
+            return vals_[fill_ - 1];
+        }
+
         void push_back( value_type val )
         {
             vals_[fill_++] = std::move(val);

@@ -50,7 +50,7 @@ std::size_t upper_bound( const T *arr, std::size_t length,
 template <typename T, std::size_t NodeMax, typename Less = std::less<T> >
 struct btree {
 
-    static_assert( NodeMax > 2, "Count must be greater then 2" );
+    static_assert( NodeMax > 2, "Maximum must be at least 3" );
 
     static const std::size_t maximum = NodeMax;
     static const std::size_t middle  = maximum / 2;
@@ -115,7 +115,7 @@ struct btree {
 
             if( !l->is_leaf( ) ) {
                 r->next_.push_front( std::move( l->next_[l->size( )] ) );
-                r->next_[0]->parent_ = r;
+                r->next_.front( )->parent_ = r;
                 l->next_.reduce( 1 );
             }
             l->values_.reduce( 1 );
@@ -151,8 +151,6 @@ struct btree {
 
             node->next_[pos + 1] = std::move( node->next_[pos] );
             node->next_.erase_pos(pos);
-
-            //node->next_[pos + 1].reset( );
 
             for( auto &v: r->values_ ) {
                 l->values_.push_back( std::move(v) );
@@ -224,7 +222,7 @@ struct btree {
         bnode *next_left( )
         {
             if( size( ) > 0 ) {
-                return next_[0].get( );
+                return next_.front( ).get( );
             }
             return nullptr;
         }
@@ -239,12 +237,12 @@ struct btree {
 
         value_type &last( )
         {
-            return values_[size( ) - 1];
+            return values_.back( );
         }
 
         value_type &first( )
         {
-            return values_[0];
+            return values_.front( );
         }
 
         std::size_t size( ) const
@@ -364,7 +362,8 @@ struct btree {
             return std::make_pair(std::move(src), std::move(right));
         }
 
-        std::pair<bnode *, std::size_t> node_with( const value_type &val )
+
+        std::pair<bnode *, std::size_t> node_with_rec( const value_type &val )
         {
             auto pos = lower_of( val );
 
@@ -376,6 +375,25 @@ struct btree {
                 return next_[pos]->node_with(val);
             }
 
+            return std::make_pair(nullptr, 0);
+        }
+
+        std::pair<bnode *, std::size_t> node_with( const value_type &val )
+        {
+
+            auto next = this ;
+            while( next ) {
+
+                auto pos = next->lower_of( val );
+
+                if( pos != next->values_.size( ) &&
+                    cmp::eq(next->values_[pos], val) )
+                {
+                    return std::make_pair(next, pos);
+                }
+
+                next = next->next_[pos].get( );
+            }
             return std::make_pair(nullptr, 0);
         }
 
@@ -518,11 +536,11 @@ struct btree {
 int main( )
 {
 
-    auto maxx = 130000;
+    auto maxx = 1000000;
 
     srand(time(nullptr));
 
-    using btree_type = btree<int, 27>;
+    using btree_type = btree<int, 64>;
     btree_type bt;
 
     for( auto i=1; i<=maxx; i++ ) {
