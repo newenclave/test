@@ -478,8 +478,6 @@ struct btree {
             return std::make_pair(nullptr, nullptr);
         }
 
-
-
         template <typename Call>
         void for_each_impl( bnode *node, Call &call )
         {
