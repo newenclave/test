@@ -133,7 +133,7 @@ struct btree {
         {
             auto node = node_with( val );
             if( node.first ) {
-                node.first->erase_fix( val, node.second );
+                node.first->erase_fix( node.second );
             }
         }
 
@@ -193,7 +193,7 @@ struct btree {
         }
 
         static
-        void merge( const value_type &val, bnode *node, std::size_t pos )
+        void merge( bnode *node, std::size_t pos )
         {
             auto l = node->next_[pos].get( );
             auto r = std::move(node->next_[pos + 1]);
@@ -215,11 +215,11 @@ struct btree {
             }
 
             if( node->empty( ) && node->parent_ ) {
-                node->fix_me( val );
+                node->fix_me( );
             }
         }
 
-        void fix_me( const value_type &val )
+        void fix_me( )
         {
             auto sb = siblings( );
 
@@ -236,39 +236,39 @@ struct btree {
                 auto pp = my_position( );
 
                 if( sb.first ) {
-                    merge( val, parent_, pp - 1 );
+                    merge( parent_, pp - 1 );
                 } else {
-                    merge( val, parent_, pp );
+                    merge( parent_, pp );
                 }
             }
         }
 
-        void remove_from_leaf( const value_type &val, std::size_t pos )
+        void remove_from_leaf( std::size_t pos )
         {
 
             values_.erase_pos( pos );
 
             if( empty( ) && parent_ ) {
-                fix_me( val );
+                fix_me( );
             }
         }
 
-        void remove_from_node( const value_type &val, std::size_t pos )
+        void remove_from_node( std::size_t pos )
         {
             auto ml = most_left( next_[pos].get( ) );
             values_[pos] = std::move(ml->last( ));
             ml->values_.reduce( 1 ); /// leaf! doesn't have children
             if( ml->empty( ) ) {
-                ml->fix_me( val );
+                ml->fix_me( );
             }
         }
 
-        void erase_fix( const value_type &val, std::size_t pos )
+        void erase_fix( std::size_t pos )
         {
             if( is_leaf( ) ) {
-                remove_from_leaf( val, pos );
+                remove_from_leaf( pos );
             } else {
-                remove_from_node( val, pos );
+                remove_from_node( pos );
             }
         }
 
@@ -291,7 +291,9 @@ struct btree {
         void insert( value_type val )
         {
             if( values_.empty( ) ) {
-                values_.emplace(values_.begin( ), std::move(val));
+
+                values_.push_back( std::move(val) );
+
             } else {
 
                 auto pos = lower_of( val );
@@ -476,6 +478,31 @@ struct btree {
             return std::make_pair(nullptr, nullptr);
         }
 
+
+
+        template <typename Call>
+        void for_each_impl( bnode *node, Call &call )
+        {
+            std::size_t i = 0;
+            if( node->is_leaf( ) ) {
+                for( ; i<node->values_.size( ); i++ ) {
+                    call( node->values_[i] );
+                }
+            } else {
+                for( ; i<node->values_.size( ); i++ ) {
+                    for_each_impl(node->next_[i].get( ), call);
+                    call( node->values_[i] );
+                }
+                for_each_impl(node->next_[i].get( ), call);
+            }
+        }
+
+        template <typename Call>
+        void for_each( Call call )
+        {
+            for_each_impl(this, call);
+        }
+
         bnode *parent_ = nullptr;
         value_array   values_;
         pointer_array next_;
@@ -536,7 +563,7 @@ struct btree {
 int main( )
 {
 
-    auto maxx = 1000000;
+    auto maxx = 200;
 
     srand(time(nullptr));
 
@@ -544,8 +571,14 @@ int main( )
     btree_type bt;
 
     for( auto i=1; i<=maxx; i++ ) {
-        bt.insert( i );
+        bt.insert( rand( ) %1000 );
+        //bt.insert( i );
     }
+
+    bt.root_->for_each( [ ]( int i ) {
+        std::cout << " " << i;
+    } );
+    std::cout << "\n";
 
 //    bt.erase( maxx );
 //    bt.erase( maxx - 1 );
