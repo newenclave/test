@@ -104,6 +104,59 @@ struct btree {
             next_   = std::move(other.next_);
         }
 
+        value_type &last( )
+        {
+            return values_.back( );
+        }
+
+        value_type &first( )
+        {
+            return values_.front( );
+        }
+
+        std::size_t size( ) const
+        {
+            return values_.size( );
+        }
+
+        bool empty( ) const
+        {
+            return (size( ) < minimum);
+        }
+
+        bool has_donor( ) const
+        {
+            return (size( ) > minimum);
+        }
+
+        void erase( const value_type &val )
+        {
+            auto node = node_with( val );
+            if( node.first ) {
+                node.first->erase_fix( val, node.second );
+            }
+        }
+
+        bool full( ) const
+        {
+            return values_.full( );
+        }
+
+        bool is_leaf( ) const
+        {
+            return next_.empty( );
+        }
+
+        std::size_t lower_of( const value_type &val ) const
+        {
+            return lower_bound( &values_[0], values_.size( ), val, cmp( ) );
+        }
+
+        std::size_t upper_of( const value_type &val ) const
+        {
+            return upper_bound( &values_[0], values_.size( ), val, cmp( ) );
+        }
+
         static
         void rotate_cw( bnode *node, std::size_t pos ) // clock wise
         {
@@ -233,59 +286,6 @@ struct btree {
                 return next_[size( )].get( );
             }
             return nullptr;
-        }
-
-        value_type &last( )
-        {
-            return values_.back( );
-        }
-
-        value_type &first( )
-        {
-            return values_.front( );
-        }
-
-        std::size_t size( ) const
-        {
-            return values_.size( );
-        }
-
-        bool empty( ) const
-        {
-            return (size( ) < minimum);
-        }
-
-        bool has_donor( ) const
-        {
-            return (size( ) > minimum);
-        }
-
-        void erase( const value_type &val )
-        {
-            auto node = node_with( val );
-            if( node.first ) {
-                node.first->erase_fix( val, node.second );
-            }
-        }
-
-        bool full( ) const
-        {
-            return values_.full( );
-        }
-
-        bool is_leaf( ) const
-        {
-            return next_.empty( );
-        }
-
-        std::size_t lower_of( const value_type &val ) const
-        {
-            return lower_bound( &values_[0], values_.size( ), val, cmp( ) );
-        }
-
-        std::size_t upper_of( const value_type &val ) const
-        {
-            return upper_bound( &values_[0], values_.size( ), val, cmp( ) );
         }
 
         void insert( value_type val )
