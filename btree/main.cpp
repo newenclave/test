@@ -148,15 +148,18 @@ struct btree {
             l->values_.push_back( std::move(node->values_[pos]) );
 
             node->values_.erase_pos(pos);
+
             node->next_[pos + 1] = std::move( node->next_[pos] );
             node->next_.erase_pos(pos);
+
+            //node->next_[pos + 1].reset( );
 
             for( auto &v: r->values_ ) {
                 l->values_.push_back( std::move(v) );
             }
 
             for( auto &p: r->next_ ) {
-                //p->parent_ = l->parent_;
+                p->parent_ = l;
                 l->next_.push_back( std::move(p) );
             }
 
@@ -171,7 +174,7 @@ struct btree {
 
             if( sb.first && sb.first->has_donor( ) ) {
 
-                rotate_cw( parent_, my_position( ) );
+                rotate_cw( parent_, my_position( ) - 1 );
 
             } else if( sb.second && sb.second->has_donor( ) ) {
 
@@ -201,7 +204,7 @@ struct btree {
 
         void remove_from_node( const value_type &val, std::size_t pos )
         {
-            auto ml = most_left( this );
+            auto ml = most_left( next_[pos].get( ) );
             values_[pos] = std::move(ml->last( ));
             ml->values_.reduce( 1 ); /// leaf! doesn't have children
             if( ml->empty( ) ) {
@@ -308,6 +311,8 @@ struct btree {
 
                     next_[pos]->insert(std::move(val));
 
+                    auto nnn = next_[pos].get( );
+
                     if( next_[pos]->full( ) ) {
 
                         val = std::move(next_[pos]->values_[middle]);
@@ -337,19 +342,19 @@ struct btree {
 
             ptr_type right(new bnode);
 
-            right->parent_ = src->parent_;
-
             right->values_.assign( src->values_.begin( ) + (middle + 1),
                                    src->values_.end( ) );
 
             if(!src->next_.empty( ) ) {
 
-                right->next_.assign_move( src->next_.begin( ) + (middle + 1),
-                                          src->next_.end( ) );
-
-                for( std::size_t i = splitter; i < maximum + 1; ++i ) {
-                    src->next_[i].reset( );
+                for( std::size_t i = middle + 1; i < src->next_.size( ); ++i ) {
+                    src->next_[i]->parent_ = right.get( );
+                    right->next_.push_back( std::move(src->next_[i]));
                 }
+
+//                for( std::size_t i = splitter; i < maximum + 1; ++i ) {
+//                    src->next_[i].reset( );
+//                }
 
                 src->next_.reduce(splitter);
             }
@@ -420,11 +425,13 @@ struct btree {
         {
             if(values_.empty( )) {
                 size_t my_pos = 0;
-                for( ;parent_->next_.size( ); ++my_pos ) {
+
+                for( ;my_pos < parent_->next_.size( ); ++my_pos ) {
                     if( parent_->next_[my_pos].get( ) == this ) {
                         break;
                     }
                 }
+
                 return my_pos;
             } else {
                 return parent_->lower_of( values_[0] );
@@ -479,13 +486,10 @@ struct btree {
             pair.first->parent_  = new_root.get( );
             pair.second->parent_ = new_root.get( );
 
-            new_root->values_.insert( new_root->values_.begin( ),
-                                      std::move(val) );
-            new_root->next_.insert( new_root->next_.end( ),
-                                    std::move(pair.first) );
+            new_root->values_.push_back( std::move(val) );
+            new_root->next_.push_back( std::move(pair.first) );
+            new_root->next_.push_back( std::move(pair.second) );
 
-            new_root->next_.insert( new_root->next_.end( ),
-                                    std::move(pair.second) );
             root_.swap(new_root);
 
         }
@@ -495,39 +499,64 @@ struct btree {
     std::unique_ptr<bnode> root_;
 };
 
-template <typename A>
-void print( const A &a )
-{
-    for( auto &v: a ) {
-        std::cout << " " << v;
+    template <typename A>
+    void print( const A &a )
+    {
+        for( auto &v: a ) {
+            std::cout << " " << v;
+        }
+        std::cout << "\ntotal: " << a.size( ) << "\n";
     }
-    std::cout << "\ntotal: " << a.size( ) << "\n";
-}
 
-std::size_t minim( std::size_t v )
-{
-    return (v / 2) + (v % 2) - 1;
-}
+    std::size_t minim( std::size_t v )
+    {
+        return (v / 2) + (v % 2) - 1;
+    }
 
 }
 
 int main( )
 {
 
-    auto maxx = 30000;
+    auto maxx = 130000;
 
     srand(time(nullptr));
 
-    using btree_type = btree<int, 7>;
+    using btree_type = btree<int, 48>;
     btree_type bt;
 
     for( auto i=1; i<=maxx; i++ ) {
         bt.insert( i );
     }
 
+//    bt.erase( maxx );
+//    bt.erase( maxx - 1 );
+
+////    bt.erase( 11 );
+////    bt.erase( 8 );
+////    bt.erase( 5 );
+////    bt.erase( 1 );
+
+    std::cout << "Ok!\n";
+//    return 0;
+
+    auto nw = bt.root_->node_with( maxx - 1 );
+
+    if( nw.first ) {
+        auto n = nw.first;
+        while( n ) {
+            print(n->values_);
+            if( n->parent_ ) {
+                std::cout << n->my_position( ) << "\n";
+            }
+            n = n->parent_;
+        }
+    }
+
     for( auto i=maxx; i>=1; i-- ) {
         bt.erase( i );
     }
+
 
 //    auto nw = bt.root_->node_with( 3 );
 //    //auto nw = bt.root_->node_with( random() % 2100 );
@@ -539,6 +568,8 @@ int main( )
 //        print( nw.first->values_ );
 //        std::cout << nw.second << "\n";
 //    }
+
+    std::cout << "Ok!\n";
 
     return 0;
 }
