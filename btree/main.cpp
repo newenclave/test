@@ -311,7 +311,7 @@ struct btree {
 
                     next_[pos]->insert(std::move(val));
 
-                    auto nnn = next_[pos].get( );
+                    //auto nnn = next_[pos].get( );
 
                     if( next_[pos]->full( ) ) {
 
@@ -522,7 +522,7 @@ int main( )
 
     srand(time(nullptr));
 
-    using btree_type = btree<int, 48>;
+    using btree_type = btree<int, 27>;
     btree_type bt;
 
     for( auto i=1; i<=maxx; i++ ) {
