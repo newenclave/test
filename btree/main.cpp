@@ -47,7 +47,53 @@ std::size_t upper_bound( const T *arr, std::size_t length,
     return next;
 }
 
-template <typename T, std::size_t NodeMax, typename Less = std::less<T> >
+template <typename T, typename Less = std::less<T> >
+struct value_trait {
+
+    using value_type = T;
+    using key_type   = T;
+    using less       = Less;
+
+    struct key_access {
+        static
+        key_type &get( value_type &t )
+        {
+            return t;
+        }
+
+        static
+        const key_type &get( const value_type &t )
+        {
+            return t;
+        }
+    };
+
+};
+
+template <typename KeyT, typename ValueT, typename Less = std::less<KeyT> >
+struct map_trait {
+
+    using value_type = std::pair<KeyT, ValueT>;
+    using key_type   = KeyT;
+    using less       = Less;
+
+    struct key_access {
+        static
+        const key_type &get( value_type &t )
+        {
+            return t.first;
+        }
+
+        static
+        const key_type &get( const value_type &t )
+        {
+            return t.first;
+        }
+    };
+
+};
+
+template <typename ValueTrait, std::size_t NodeMax>
 struct btree {
 
     static_assert( NodeMax > 2, "Maximum must be at least 3" );
@@ -57,8 +103,12 @@ struct btree {
     static const std::size_t odd     = maximum % 2;
     static const std::size_t minimum = middle  + odd - 1;
 
-    using value_type = T;
-    using key_type   = T;
+    using value_trait = ValueTrait;
+    using value_type  = typename value_trait::value_type;
+    using key_type    = typename value_trait::key_type;
+    using less_cmp    = typename value_trait::less;
+    using key_access  = typename value_trait::key_access;
+
 
     btree( )
         :root_(new bnode)
@@ -67,15 +117,22 @@ struct btree {
     struct cmp {
 
         static
-        bool eq( const value_type &l, const value_type &r )
+        bool equal( const key_type &l, const key_type &r )
         {
-            using op = details::operators::cmp<T, Less>;
+            using op = details::operators::cmp<key_type, less_cmp>;
             return op::equal(l, r);
         }
 
-        bool operator ( ) ( const value_type &l, const value_type &r ) const
+        static
+        bool less( const key_type &l, const key_type &r )
         {
-            using op = details::operators::cmp<T, Less>;
+            using op = details::operators::cmp<key_type, less_cmp>;
+            return op::less(l, r);
+        }
+
+        bool operator ( ) ( const key_type &l, const key_type &r ) const
+        {
+            using op = details::operators::cmp<key_type, less_cmp>;
             return op::less(l, r);
         }
     };
@@ -150,12 +207,35 @@ struct btree {
 
         std::size_t lower_of( const key_type &val ) const
         {
-            return lower_bound( &values_[0], values_.size( ), val, cmp( ) );
+            using KA = key_access;
+
+            std::size_t length = values_.size( );
+            std::size_t next   = 0;
+
+            while( next < length ) {
+                std::size_t middle = next + ( ( length - next ) >> 1 );
+                if( cmp::less( KA::get(values_[middle]), val ) ) {
+                    next = middle + 1;
+                } else {
+                    length = middle;
+                }
+            }
+            return next;
         }
 
         std::size_t upper_of( const key_type &val ) const
         {
-            return upper_bound( &values_[0], values_.size( ), val, cmp( ) );
+            std::size_t length = values_.size( );
+            std::size_t next   = 0;
+            while( next < length ) {
+                std::size_t middle = next + ( ( length - next ) >> 1 );
+                if( cmp::less(val, values_[middle]) ) {
+                    length = middle;
+                } else {
+                    next = middle + 1;
+                }
+            }
+            return next;
         }
 
         static
@@ -291,15 +371,18 @@ struct btree {
 
         void insert( value_type val )
         {
+            using KA = key_access;
+
             if( values_.empty( ) ) {
 
                 values_.push_back( std::move(val) );
 
             } else {
 
-                auto pos = lower_of( val );
+                auto pos = lower_of( key_access::get(val) );
 
-                if( pos != values_.size( ) && cmp::eq(values_[pos], val ) ) {
+                if( pos != values_.size( ) &&
+                    cmp::equal( KA::get(values_[pos]), KA::get(val) ) ) {
                     return;
                 }
 
@@ -370,7 +453,7 @@ struct btree {
         {
             auto pos = lower_of( val );
 
-            if( pos != values_.size( ) && cmp::eq(values_[pos], val) ) {
+            if( pos != values_.size( ) && cmp::equal(values_[pos], val) ) {
                 return std::make_pair(this, pos);
             }
 
@@ -383,14 +466,14 @@ struct btree {
 
         std::pair<bnode *, std::size_t> node_with( const key_type &val )
         {
-
+            using KA = key_access;
             auto next = this ;
             while( next ) {
 
                 auto pos = next->lower_of( val );
 
                 if( pos != next->values_.size( ) &&
-                    cmp::eq(next->values_[pos], val) )
+                    cmp::equal(KA::get(next->values_[pos]), val) )
                 {
                     return std::make_pair(next, pos);
                 }
@@ -455,7 +538,7 @@ struct btree {
 
                 return my_pos;
             } else {
-                return parent_->lower_of( values_[0] );
+                return parent_->lower_of( key_access::get(values_[0]) );
             }
         }
 
@@ -466,7 +549,7 @@ struct btree {
                 return siblings_by_pos( my_pos );
 
             } else {
-                return siblings( values_[0] );
+                return siblings( key_access::get(values_[0]) );
             }
         }
 
@@ -556,7 +639,6 @@ struct btree {
     {
         return (v / 2) + (v % 2) - 1;
     }
-
 }
 
 int main( )
@@ -566,7 +648,14 @@ int main( )
 
     srand(time(nullptr));
 
-    using btree_type = btree<int, 64>;
+    btree<map_trait<int, float>, 64> bm;
+
+    bm.insert( std::make_pair(10, 10.10) );
+    bm.erase( 10 );
+
+    return 0;
+
+    using btree_type = btree<value_trait<int>, 64>;
     btree_type bt;
 
     for( auto i=1; i<=maxx; i++ ) {
