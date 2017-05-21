@@ -336,7 +336,7 @@ struct btree {
 
         void remove_from_node( std::size_t pos )
         {
-            auto ml = most_left( next_[pos].get( ) );
+            auto ml = most_right( next_[pos].get( ) );
             values_[pos] = std::move(ml->last( ));
             ml->values_.reduce( 1 ); /// leaf! doesn't have children
             if( ml->empty( ) ) {
@@ -348,8 +348,10 @@ struct btree {
         {
             if( is_leaf( ) ) {
                 remove_from_leaf( pos );
+                std::cout << "Leaf remove!\n";
             } else {
                 remove_from_node( pos );
+                std::cout << "Node remove!\n";
             }
         }
 
@@ -638,12 +640,27 @@ struct btree {
     {
         return (v / 2) + (v % 2) - 1;
     }
+
+    template <typename Rb>
+    void print_tree( Rb &bt )
+    {
+        int min = 0;
+        bt.root_->for_each( [&min]( int i ) {
+            if( i < min ) {
+                std::cout << "!!!!!!!\n";
+            }
+            min = i;
+            std::cout << " " << i;
+        } );
+        std::cout << "\n";
+    }
+
 }
 
 int main( )
 {
 
-    auto maxx = 20000;
+    auto maxx = 100;
 
     srand(time(nullptr));
 
@@ -658,22 +675,18 @@ int main( )
     btree_type bt;
 
     for( auto i=1; i<=maxx; i++ ) {
-        bt.insert( rand( ) %1000 );
-        //bt.insert( i );
+        bt.insert( rand( ) % maxx );
+        bt.insert( i );
     }
 
-    int min = 0;
+    print_tree(bt);
 
+    //bt.erase( 9 );
+//    bt.erase( 4 );
 
-//    bt.erase( maxx );
-//    bt.erase( maxx - 1 );
+//    print_tree( bt );
 
-////    bt.erase( 11 );
-////    bt.erase( 8 );
-////    bt.erase( 5 );
-////    bt.erase( 1 );
-
-    std::cout << "Ok!\n";
+//    std::cout << "Ok!\n";
 //    return 0;
 
     auto nw = bt.root_->node_with( maxx - 1 );
@@ -690,19 +703,15 @@ int main( )
     }
 
     for( auto i=maxx; i>=1; i-- ) {
-        bt.erase( i );
+        auto r = rand( ) % maxx;
+
+        std::cout << "remove " << r << "\n==============\n";
+        bt.erase( r );
+        print_tree(bt);
+        std::cout << "\n==============\n";
     }
 
-
-    bt.root_->for_each( [&min]( int i ) {
-        if( i < min ) {
-            std::cout << "!!!!!!!\n";
-        }
-        min = i;
-        std::cout << " " << i;
-    } );
-    std::cout << "\n";
-
+    print_tree(bt);
 
 //    auto nw = bt.root_->node_with( 3 );
 //    //auto nw = bt.root_->node_with( random() % 2100 );
