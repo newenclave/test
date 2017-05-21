@@ -336,8 +336,14 @@ struct btree {
 
         void remove_from_node( std::size_t pos )
         {
+            /// Here we get the node from the left
             auto ml = most_right( next_[pos].get( ) );
             values_[pos] = std::move(ml->last( ));
+
+            /// And here from the right
+//            auto ml = most_left( next_[pos + 1].get( ) );
+//            values_[pos] = std::move(ml->first( ));
+
             ml->values_.reduce( 1 ); /// leaf! doesn't have children
             if( ml->empty( ) ) {
                 ml->fix_me( );
@@ -348,10 +354,8 @@ struct btree {
         {
             if( is_leaf( ) ) {
                 remove_from_leaf( pos );
-                std::cout << "Leaf remove!\n";
             } else {
                 remove_from_node( pos );
-                std::cout << "Node remove!\n";
             }
         }
 
@@ -660,7 +664,7 @@ struct btree {
 int main( )
 {
 
-    auto maxx = 100;
+    auto maxx = 1005;
 
     srand(time(nullptr));
 
@@ -679,15 +683,7 @@ int main( )
         bt.insert( i );
     }
 
-    print_tree(bt);
-
-    //bt.erase( 9 );
-//    bt.erase( 4 );
-
-//    print_tree( bt );
-
-//    std::cout << "Ok!\n";
-//    return 0;
+//    print_tree(bt);
 
     auto nw = bt.root_->node_with( maxx - 1 );
 
