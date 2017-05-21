@@ -381,10 +381,10 @@ struct btree {
 
                 auto pos = lower_of( key_access::get(val) );
 
-                if( pos != values_.size( ) &&
-                    cmp::equal( KA::get(values_[pos]), KA::get(val) ) ) {
-                    return;
-                }
+//                if( pos != values_.size( ) &&
+//                    cmp::equal( KA::get(values_[pos]), KA::get(val) ) ) {
+//                    return;
+//                }
 
                 if( is_leaf(  ) ) {
 
@@ -447,7 +447,6 @@ struct btree {
 
             return std::make_pair(std::move(src), std::move(right));
         }
-
 
         std::pair<bnode *, std::size_t> node_with_rec( const key_type &val )
         {
@@ -644,18 +643,18 @@ struct btree {
 int main( )
 {
 
-    auto maxx = 200;
+    auto maxx = 20000;
 
     srand(time(nullptr));
 
-    btree<map_trait<int, float>, 64> bm;
+//    btree<map_trait<int, float>, 64> bm;
 
-    bm.insert( std::make_pair(10, 10.10) );
-    bm.erase( 10 );
+//    bm.insert( std::make_pair(10, 10.10) );
+//    bm.erase( 10 );
 
-    return 0;
+//    return 0;
 
-    using btree_type = btree<value_trait<int>, 64>;
+    using btree_type = btree<value_trait<int>, 3>;
     btree_type bt;
 
     for( auto i=1; i<=maxx; i++ ) {
@@ -665,13 +664,6 @@ int main( )
 
     int min = 0;
 
-    bt.root_->for_each( [&min]( int i ) {
-        if( i < min ) {
-            std::cout << "!!!!!!!\n";
-        }
-        std::cout << " " << i;
-    } );
-    std::cout << "\n";
 
 //    bt.erase( maxx );
 //    bt.erase( maxx - 1 );
@@ -700,6 +692,16 @@ int main( )
     for( auto i=maxx; i>=1; i-- ) {
         bt.erase( i );
     }
+
+
+    bt.root_->for_each( [&min]( int i ) {
+        if( i < min ) {
+            std::cout << "!!!!!!!\n";
+        }
+        min = i;
+        std::cout << " " << i;
+    } );
+    std::cout << "\n";
 
 
 //    auto nw = bt.root_->node_with( 3 );
