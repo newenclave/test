@@ -7,7 +7,7 @@
 
 using namespace etool;
 
-//using page_intervals = intervals::set<>
+using page_intervals = intervals::set<std::uint32_t>;
 
 struct file_source {
 
@@ -111,9 +111,13 @@ struct data_source {
     template <typename T>
     using byte_order = details::byte_order_big<T>;
 
+    using file_size      = std::uint64_t;
+    using block_size     = std::uint32_t;
+    using block_position = file_size;
+
     struct allocated {
-        std::size_t block_start;
-        std::size_t size;
+        block_size position;
+        block_size count;    /// count
     };
 
     data_source( )
@@ -140,7 +144,7 @@ struct data_source {
     data_source open( const std::string &data )
     {
         data_source res;
-        res.f_.open( data, "rb+" );
+        res.f_.open( data, "r+b" );
 
         std::string buf( 16, '\0' );
 
@@ -158,15 +162,15 @@ struct data_source {
     allocated allocate( std::size_t size )
     {
         auto blocks = size2blocks( size );
+
         allocated res;
 
         f_.seek( block2pos( blocks ) - 1 );
         f_.write( "\0", 1 );
 
-        res.size        = blocks * block_size_;
-        res.block_start = last_block_;
-
-        last_block_ = blocks;
+        res.count     = blocks;
+        res.position  = last_block_;
+        last_block_  += blocks;
 
         return res;
     }
@@ -176,43 +180,46 @@ struct data_source {
                  std::uint8_t header_size )
     {
         std::string head( "edb", 4 );
-        head.push_back( static_cast<char>(block) );
+        head.push_back( static_cast<char>( block ) );
         head.push_back( static_cast<char>( header_size ) );
 
+        auto old_size = head.size( );
         head.resize( block2size(header_size) );
+        byte_order<block_size>
 
         file_source fs(data, "wb");
-        std::cout << fs.write( head.c_str( ), head.size( ) ) << "\n";
+
         fs.flush( );
     }
 
-    static
-    std::size_t block2size( std::uint8_t block )
+    static constexpr
+    std::uint32_t block2size( std::uint8_t block )
     {
-        return ((block + 1) * 512);
+        return ((static_cast<std::uint32_t>(block & 0x7F) + 1) * 512);
     }
 
-    std::size_t size2blocks( std::size_t size )
+    std::uint32_t size2blocks( std::uint64_t size )
     {
-        return (size / block_size_) + ((size % block_size_) ? 1 : 0);
+        auto block = (size / block_size_) + ((size % block_size_) ? 1 : 0);
+        return static_cast<std::uint32_t>( block & 0xFFFFFFFF );
     }
 
-    std::size_t block2pos( std::size_t block )
+    file_size block2pos( block_size block )
     {
-        return  (block * block_size_) + first_block_;
+        return (static_cast<file_size>(block) * block_size_) + first_block_;
     }
 
     std::size_t write( const allocated &all, std::string data )
     {
-        f_.seek( block2pos(all.block_start) );
+        f_.seek( block2pos(all.position) );
         return f_.write( data.c_str( ), data.size( ) );
     }
 
     file_source f_;
 
-    std::size_t block_size_  = 0;
-    std::size_t first_block_ = 1;
-    std::size_t last_block_  = 1;
+    block_size block_size_  = 0;
+    block_size first_block_ = 1;
+    block_size last_block_  = 1;
 };
 
 int main( int argc, char *argv[] )
@@ -224,19 +231,6 @@ int main( int argc, char *argv[] )
 
     auto al = ds.allocate( 1025 );
     ds.write( al, "Hello there!" );
-
-    return 0;
-
-    std::fstream fout;
-    std::ofstream fin;
-
-    //fin.open( "/tmp/example.bin", std::ios::binary | std::ios::in | std::ios::app );
-    //fout.open( "/tmp/example.bin", std::ios::binary | std::ios::in | std::ios::out | std::ios::app );
-    if( fout.is_open(  ) ) {
-        fout.seekp( 24 * 1024 );
-        std::cout << fout.tellp(  ) << "\n";
-        fout.write( "qwertyuuio", 10 );
-    }
 
     return 0;
 }
