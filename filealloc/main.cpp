@@ -99,6 +99,12 @@ struct file_source {
         return fwrite( data, 1, len, file_ );
     }
 
+    std::size_t write_to( std::uint64_t pos, const void *data, std::size_t len )
+    {
+        seek( pos );
+        return write( data, len );
+    }
+
     std::size_t read( void *data, std::size_t len )
     {
         return fread( data, 1, len, file_ );
@@ -453,12 +459,20 @@ struct data_source {
                 f_.write( header.c_str( ), header.size( ) );
             }
         }
+
+        block_id first_id = 0;
+
         if( !free_blocks_.ivals_.empty( ) ) {
-            std::string first;
-            bytes::append(free_blocks_.ivals_.begin( )->second.id, first);
-            f_.seek( 10 );
-            f_.write(first.c_str( ), first.size( ));
+            first_id = free_blocks_.ivals_.begin( )->second.id;
         }
+
+        std::string first;
+        bytes::append(first_id, first);
+        f_.write_to(10, first.c_str( ), first.size( ));
+
+        first.clear( );
+        bytes::append(last_block_, first);
+        f_.write_to( 6, first.c_str( ), first.size( ) );
 
     }
 
