@@ -499,6 +499,8 @@ int main( int argc, char *argv[] )
     free_block_info first;
     free_block_info second;
 
+    //auto a1 = ds.a
+
     first.id = 1;
     first.block.count = 2;
     first.block.next  = 3;
@@ -518,6 +520,7 @@ int main( int argc, char *argv[] )
                   << "\n";
     }
 
+    ds.last_block_ = 7;
     ds.save_free( );
 
     return 0;
