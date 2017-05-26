@@ -385,6 +385,14 @@ struct data_source {
         block_id     last_id;
         block_id     first_free;
 
+        db_header( )
+        {
+            magic[0] = 'e' ;
+            magic[1] = 'd' ;
+            magic[2] = 'b' ;
+            magic[3] = '\0';
+        }
+
         static std::size_t size( )
         {
             return sizeof(magic)
@@ -407,6 +415,20 @@ struct data_source {
                 last_id       = byte_order<block_id>::read(&data[6]);
                 first_free    = byte_order<block_id>::read(&data[10]);
             }
+        }
+
+        std::string serialize(  ) const
+        {
+            std::string res;
+            res.push_back(magic[0]);
+            res.push_back(magic[1]);
+            res.push_back(magic[2]);
+            res.push_back(magic[3]);
+            bytes::append( block_factor, res );
+            bytes::append( header_factor, res );
+            bytes::append( last_id, res );
+            bytes::append( first_free, res );
+            return res;
         }
     };
 
