@@ -326,22 +326,19 @@ namespace {
     };
 
     struct allocated_block {
+
         block_id count;
-        file_pos usage;
 
         static
         file_pos size( )
         {
-            return sizeof(block_id)
-                 + sizeof(file_pos)
-                 ;
+            return sizeof(block_id);
         }
 
         std::string serialize( ) const
         {
             std::string res;
             bytes::append( count, res );
-            bytes::append( usage, res );
             return res;
         }
 
@@ -349,12 +346,11 @@ namespace {
         {
             if( from.size( ) >= size( ) ) {
                 count = byte_order<block_id>::read( &from[0] );
-                usage = byte_order<file_pos>::read( &from[sizeof(count)] );
             }
         }
     };
 
-    struct block_info {
+    struct allocated_block_info {
         block_id id;
         allocated_block block;
     };
@@ -375,11 +371,52 @@ struct data_source {
 
     data_source( data_source &&other )
         :f_(std::move(other.f_))
-    { }
+    {
+        header_size_ = other.header_size_ ;
+        last_block_  = other.last_block_  ;
+        block_size_  = other.block_size_  ;
+        free_blocks_ = other.free_blocks_ ;
+    }
+
+    struct db_header {
+        char magic[4];
+        std::uint8_t block_factor;
+        std::uint8_t header_factor;
+        block_id     last_id;
+        block_id     first_free;
+
+        static std::size_t size( )
+        {
+            return sizeof(magic)
+                    + sizeof(block_factor)
+                    + sizeof(header_factor)
+                    + sizeof(last_id)
+                    + sizeof(first_free)
+                    ;
+        }
+
+        void parse( const std::string &data )
+        {
+            if( data.size( ) >= size( ) ) {
+                magic[0] = data[0];
+                magic[1] = data[1];
+                magic[2] = data[2];
+                magic[3] = data[3];
+                block_factor  = static_cast<std::uint8_t>(data[4]);
+                header_factor = static_cast<std::uint8_t>(data[5]);
+                last_id       = byte_order<block_id>::read(&data[6]);
+                first_free    = byte_order<block_id>::read(&data[10]);
+            }
+        }
+    };
 
     data_source &operator = ( data_source &&other )
     {
         f_.swap( other.f_ );
+        header_size_ = other.header_size_ ;
+        last_block_  = other.last_block_  ;
+        block_size_  = other.block_size_  ;
+        free_blocks_ = other.free_blocks_ ;
         return *this;
     }
 
@@ -450,13 +487,55 @@ struct data_source {
         fs.flush( );
     }
 
-    void save_free( )
+    allocated_block_info load( block_id block )
+    {
+        std::string header( allocated_block::size( ), '\0' );
+        allocated_block_info res;
+        f_.seek( block );
+        auto read = f_.read( &header[0], header.size( ) );
+        if( read == header.size( ) ) {
+            res.id = block;
+            res.block.parse( header );
+        }
+        return res;
+    }
+
+    allocated_block_info allocate( std::size_t bytes )
+    {
+        allocated_block_info res;
+        auto blocks = size2blocks( bytes );
+        auto ad = free_blocks_.allocate( blocks );
+        if( ad ) {
+            res.id = ad;
+        } else {
+            res.id = last_block_;
+            last_block_ += blocks;
+        }
+        res.block.count = blocks;
+        std::cout << write_to( res.id, res.block.serialize( ) ) << "\n";
+        return res;
+    }
+
+    void free( const allocated_block_info &inf )
+    {
+        free_block_info freed(inf.id);
+        freed.block.count = inf.block.count;
+        freed.block.next  = 0;
+        free_blocks_.add( freed );
+    }
+
+    std::size_t write_to( block_id block, const std::string &data )
+    {
+        auto pos = block2pos( block );
+        return f_.write_to( pos, data.c_str( ), data.size( ) );
+    }
+
+    void save( )
     {
         for( auto &n: free_blocks_.ivals_ ) {
             if( n.second.dirty ) {
                 auto header = n.second.block.serialize( );
-                f_.seek( n.second.id );
-                f_.write( header.c_str( ), header.size( ) );
+                write_to( n.second.id, header );
             }
         }
 
@@ -467,11 +546,9 @@ struct data_source {
         }
 
         std::string first;
-        bytes::append(first_id, first);
-        f_.write_to(10, first.c_str( ), first.size( ));
+        bytes::append( last_block_, first );
+        bytes::append( first_id,    first );
 
-        first.clear( );
-        bytes::append(last_block_, first);
         f_.write_to( 6, first.c_str( ), first.size( ) );
 
     }
@@ -506,36 +583,25 @@ struct data_source {
 int main( int argc, char *argv[] )
 {
 
-//    data_source::create( "/tmp/example.bin", 1, 0 );
+    data_source::create( "/tmp/example.bin", 1, 0 );
+    return 0;
 
     auto ds = data_source::open( "/tmp/example.bin" );
 
-    free_block_info first;
-    free_block_info second;
-
-    //auto a1 = ds.a
-
-    first.id = 1;
-    first.block.count = 2;
-    first.block.next  = 3;
-
-    second.id = 3;
-    second.block.count = 5;
-    second.block.next  = 0;
-
-    ds.free_blocks_.add( first );
-    ds.free_blocks_.add( second );
-
-    for( auto &n: ds.free_blocks_.ivals_  ) {
-        std::cout << n.first << " -> "
-                  << n.second.id << ": "
-                  << n.second.block.count << "; "
-                  << n.second.block.next << "; "
+    for( auto &n: ds.free_blocks_.ivals_ ) {
+        std::cout << n.first << ": "
+                  << n.second.block.count << " "
+                  << n.second.block.next
                   << "\n";
     }
 
-    ds.last_block_ = 7;
-    ds.save_free( );
+
+    auto a1 = ds.allocate( 10 * 1024 );
+    auto a2 = ds.allocate( 10 * 1024 );
+
+    ds.free( a1 );
+
+    ds.save( );
 
     return 0;
 }
